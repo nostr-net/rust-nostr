@@ -932,6 +932,243 @@ impl EventBuilder {
         Self::new(Kind::ChannelMuteUser, content.to_string()).tag(Tag::public_key(public_key))
     }
 
+    // ========================================
+    // NIP-29: Relay-based Groups
+    // ========================================
+
+    /// Create a group message (kind 9)
+    ///
+    /// <https://github.com/nostr-protocol/nips/blob/master/29.md>
+    ///
+    /// # Example
+    /// ```rust,no_run
+    /// use nostr::prelude::*;
+    /// use nostr::nips::nip29::GroupId;
+    ///
+    /// # fn example() -> Result<()> {
+    /// # let keys = Keys::generate();
+    /// let relay_url = Url::parse("wss://relay.example.com")?;
+    /// let group_id = GroupId::new(relay_url, "rust-devs".to_string())?;
+    /// let event = EventBuilder::group_message(group_id, "Hello group!")
+    ///     .sign_with_keys(&keys)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[inline]
+    pub fn group_message<S>(group_id: crate::nips::nip29::GroupId, content: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Self::new(Kind::ChatMessage, content).tag(Tag::group_id(group_id.to_tag_value()))
+    }
+
+    /// Add timeline references (previous events)
+    ///
+    /// <https://github.com/nostr-protocol/nips/blob/master/29.md>
+    #[inline]
+    pub fn with_previous_events(mut self, event_ids: Vec<EventId>) -> Self {
+        let refs: Vec<String> = event_ids
+            .iter()
+            .map(|id| id.to_string()[..8].to_string())
+            .collect();
+        if !refs.is_empty() {
+            self = self.tag(Tag::previous(refs));
+        }
+        self
+    }
+
+    /// Join request (kind 9021)
+    ///
+    /// <https://github.com/nostr-protocol/nips/blob/master/29.md>
+    #[inline]
+    pub fn group_join_request<S>(
+        group_id: crate::nips::nip29::GroupId,
+        message: Option<S>,
+    ) -> Self
+    where
+        S: Into<String>,
+    {
+        Self::new(
+            Kind::GroupJoinRequest,
+            message.map(|s| s.into()).unwrap_or_default(),
+        )
+        .tag(Tag::group_id(group_id.to_tag_value()))
+    }
+
+    /// Join request with invite code
+    ///
+    /// <https://github.com/nostr-protocol/nips/blob/master/29.md>
+    #[inline]
+    pub fn group_join_with_code<S>(group_id: crate::nips::nip29::GroupId, code: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Self::new(Kind::GroupJoinRequest, "").tags([
+            Tag::group_id(group_id.to_tag_value()),
+            Tag::invite_code(code.into()),
+        ])
+    }
+
+    /// Leave request (kind 9022)
+    ///
+    /// <https://github.com/nostr-protocol/nips/blob/master/29.md>
+    #[inline]
+    pub fn group_leave_request(group_id: crate::nips::nip29::GroupId) -> Self {
+        Self::new(Kind::GroupLeaveRequest, "").tag(Tag::group_id(group_id.to_tag_value()))
+    }
+
+    /// Add or update user with roles (kind 9000)
+    ///
+    /// <https://github.com/nostr-protocol/nips/blob/master/29.md>
+    pub fn group_put_user(
+        group_id: crate::nips::nip29::GroupId,
+        public_key: PublicKey,
+        roles: Vec<String>,
+    ) -> Self {
+        let mut builder = Self::new(Kind::GroupPutUser, "").tags([
+            Tag::group_id(group_id.to_tag_value()),
+            Tag::public_key(public_key),
+        ]);
+
+        for role in roles {
+            builder = builder.tag(Tag::role(role, None::<String>));
+        }
+
+        builder
+    }
+
+    /// Remove user (kind 9001)
+    ///
+    /// <https://github.com/nostr-protocol/nips/blob/master/29.md>
+    #[inline]
+    pub fn group_remove_user(
+        group_id: crate::nips::nip29::GroupId,
+        public_key: PublicKey,
+    ) -> Self {
+        Self::new(Kind::GroupRemoveUser, "").tags([
+            Tag::group_id(group_id.to_tag_value()),
+            Tag::public_key(public_key),
+        ])
+    }
+
+    /// Edit group metadata (kind 9002)
+    ///
+    /// <https://github.com/nostr-protocol/nips/blob/master/29.md>
+    pub fn group_edit_metadata(
+        group_id: crate::nips::nip29::GroupId,
+        metadata: crate::nips::nip29::GroupMetadata,
+    ) -> Self {
+        let mut builder =
+            Self::new(Kind::GroupEditMetadata, "").tag(Tag::group_id(group_id.to_tag_value()));
+
+        builder = builder.tags(Vec::<Tag>::from(metadata));
+        builder
+    }
+
+    /// Delete event (kind 9005)
+    ///
+    /// <https://github.com/nostr-protocol/nips/blob/master/29.md>
+    #[inline]
+    pub fn group_delete_event(group_id: crate::nips::nip29::GroupId, event_id: EventId) -> Self {
+        Self::new(Kind::GroupDeleteEvent, "").tags([
+            Tag::group_id(group_id.to_tag_value()),
+            Tag::event(event_id),
+        ])
+    }
+
+    /// Create group (kind 9007)
+    ///
+    /// <https://github.com/nostr-protocol/nips/blob/master/29.md>
+    pub fn group_create(
+        group_id: crate::nips::nip29::GroupId,
+        metadata: crate::nips::nip29::GroupMetadata,
+    ) -> Self {
+        let mut builder =
+            Self::new(Kind::GroupCreate, "").tag(Tag::group_id(group_id.to_tag_value()));
+
+        builder = builder.tags(Vec::<Tag>::from(metadata));
+        builder
+    }
+
+    /// Delete group (kind 9008)
+    ///
+    /// <https://github.com/nostr-protocol/nips/blob/master/29.md>
+    #[inline]
+    pub fn group_delete(group_id: crate::nips::nip29::GroupId) -> Self {
+        Self::new(Kind::GroupDelete, "").tag(Tag::group_id(group_id.to_tag_value()))
+    }
+
+    /// Create invite code (kind 9009)
+    ///
+    /// <https://github.com/nostr-protocol/nips/blob/master/29.md>
+    #[inline]
+    pub fn group_create_invite(group_id: crate::nips::nip29::GroupId) -> Self {
+        Self::new(Kind::GroupCreateInvite, "").tag(Tag::group_id(group_id.to_tag_value()))
+    }
+
+    /// Group metadata event (kind 39000, addressable)
+    ///
+    /// This is typically generated by the relay, not users.
+    ///
+    /// <https://github.com/nostr-protocol/nips/blob/master/29.md>
+    pub fn group_metadata(
+        group_id: crate::nips::nip29::GroupId,
+        metadata: crate::nips::nip29::GroupMetadata,
+    ) -> Self {
+        let mut builder = Self::new(Kind::GroupMetadata, "").tags([
+            Tag::identifier(group_id.id.clone()),
+            Tag::group_id(group_id.to_tag_value()),
+        ]);
+
+        builder = builder.tags(Vec::<Tag>::from(metadata));
+        builder
+    }
+
+    /// Group admins list (kind 39001, addressable)
+    ///
+    /// This is typically generated by the relay, not users.
+    ///
+    /// <https://github.com/nostr-protocol/nips/blob/master/29.md>
+    #[inline]
+    pub fn group_admins(
+        group_id: crate::nips::nip29::GroupId,
+        admins: crate::nips::nip29::GroupAdmins,
+    ) -> Self {
+        Self::new(Kind::GroupAdmins, "")
+            .tag(Tag::identifier(group_id.id))
+            .tags(Vec::<Tag>::from(admins))
+    }
+
+    /// Group members list (kind 39002, addressable)
+    ///
+    /// This is typically generated by the relay, not users.
+    ///
+    /// <https://github.com/nostr-protocol/nips/blob/master/29.md>
+    #[inline]
+    pub fn group_members(
+        group_id: crate::nips::nip29::GroupId,
+        members: crate::nips::nip29::GroupMembers,
+    ) -> Self {
+        Self::new(Kind::GroupMembers, "")
+            .tag(Tag::identifier(group_id.id))
+            .tags(Vec::<Tag>::from(members))
+    }
+
+    /// Group roles definition (kind 39003, addressable)
+    ///
+    /// This is typically generated by the relay, not users.
+    ///
+    /// <https://github.com/nostr-protocol/nips/blob/master/29.md>
+    #[inline]
+    pub fn group_roles(
+        group_id: crate::nips::nip29::GroupId,
+        roles: crate::nips::nip29::GroupRoles,
+    ) -> Self {
+        Self::new(Kind::GroupRoles, "")
+            .tag(Tag::identifier(group_id.id))
+            .tags(Vec::<Tag>::from(roles))
+    }
+
     /// Authentication of clients to the relay
     ///
     /// <https://github.com/nostr-protocol/nips/blob/master/42.md>

@@ -483,6 +483,55 @@ impl Tag {
         Self::from_standardized_without_cell(TagStandard::Alt(summary.into()))
     }
 
+    /// Compose `["h", "<group-id>"]` tag
+    ///
+    /// <https://github.com/nostr-protocol/nips/blob/master/29.md>
+    #[inline]
+    pub fn group_id<T>(group_id: T) -> Self
+    where
+        T: Into<String>,
+    {
+        Self::from_standardized_without_cell(TagStandard::GroupId(group_id.into()))
+    }
+
+    /// Compose `["previous", "<ref1>", "<ref2>", ...]` tag
+    ///
+    /// <https://github.com/nostr-protocol/nips/blob/master/29.md>
+    #[inline]
+    pub fn previous<I, S>(refs: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let refs: Vec<String> = refs.into_iter().map(|s| s.into()).collect();
+        Self::from_standardized_without_cell(TagStandard::Previous(refs))
+    }
+
+    /// Compose `["code", "<invite-code>"]` tag
+    ///
+    /// <https://github.com/nostr-protocol/nips/blob/master/29.md>
+    #[inline]
+    pub fn invite_code<T>(code: T) -> Self
+    where
+        T: Into<String>,
+    {
+        Self::from_standardized_without_cell(TagStandard::InviteCode(code.into()))
+    }
+
+    /// Compose `["role", "<name>"]` or `["role", "<name>", "<description>"]` tag
+    ///
+    /// <https://github.com/nostr-protocol/nips/blob/master/29.md>
+    #[inline]
+    pub fn role<S>(name: S, description: Option<S>) -> Self
+    where
+        S: Into<String>,
+    {
+        Self::from_standardized_without_cell(TagStandard::Role {
+            name: name.into(),
+            description: description.map(|s| s.into()),
+        })
+    }
+
     /// Compose custom tag
     ///
     /// JSON: `["<kind>", "<value-1>", "<value-2>", ...]`
