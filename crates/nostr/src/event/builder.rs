@@ -2515,6 +2515,213 @@ mod tests {
         assert_eq!(ids.next().unwrap(), reply.id);
         assert_eq!(ids.next().unwrap(), root_event.id);
     }
+
+    #[test]
+    #[cfg(feature = "std")]
+    fn test_nip29_group_message() {
+        use crate::nips::nip29::GroupId;
+
+        let keys = Keys::generate();
+        let relay_url = Url::parse("wss://relay.example.com").unwrap();
+        let group_id = GroupId::new(relay_url, "test-group".to_string()).unwrap();
+
+        let event = EventBuilder::group_message(group_id.clone(), "Hello group!")
+            .sign_with_keys(&keys)
+            .unwrap();
+
+        assert_eq!(event.kind, Kind::ChatMessage);
+        assert_eq!(event.content, "Hello group!");
+
+        // Check for group_id tag
+        let has_h_tag = event.tags.iter().any(|t| {
+            t.as_slice()[0] == "h" && t.as_slice()[1] == "wss://relay.example.com'test-group"
+        });
+        assert!(has_h_tag);
+    }
+
+    #[test]
+    #[cfg(feature = "std")]
+    fn test_nip29_join_request() {
+        use crate::nips::nip29::GroupId;
+
+        let keys = Keys::generate();
+        let relay_url = Url::parse("wss://relay.example.com").unwrap();
+        let group_id = GroupId::new(relay_url, "test-group".to_string()).unwrap();
+
+        // Join with message
+        let event = EventBuilder::group_join_request(group_id.clone(), Some("Please let me in"))
+            .sign_with_keys(&keys)
+            .unwrap();
+
+        assert_eq!(event.kind, Kind::GroupJoinRequest);
+        assert_eq!(event.content, "Please let me in");
+
+        // Join without message
+        let event2 = EventBuilder::group_join_request(group_id, None::<String>)
+            .sign_with_keys(&keys)
+            .unwrap();
+
+        assert_eq!(event2.content, "");
+    }
+
+    #[test]
+    #[cfg(feature = "std")]
+    fn test_nip29_join_with_code() {
+        use crate::nips::nip29::GroupId;
+
+        let keys = Keys::generate();
+        let relay_url = Url::parse("wss://relay.example.com").unwrap();
+        let group_id = GroupId::new(relay_url, "test-group".to_string()).unwrap();
+
+        let event = EventBuilder::group_join_with_code(group_id, "INVITE123")
+            .sign_with_keys(&keys)
+            .unwrap();
+
+        assert_eq!(event.kind, Kind::GroupJoinRequest);
+
+        // Check for code tag
+        let has_code_tag = event.tags.iter().any(|t| {
+            t.as_slice()[0] == "code" && t.as_slice()[1] == "INVITE123"
+        });
+        assert!(has_code_tag);
+    }
+
+    #[test]
+    #[cfg(feature = "std")]
+    fn test_nip29_moderation_events() {
+        use crate::nips::nip29::GroupId;
+
+        let admin_keys = Keys::generate();
+        let member_key = Keys::generate();
+        let relay_url = Url::parse("wss://relay.example.com").unwrap();
+        let group_id = GroupId::new(relay_url, "test-group".to_string()).unwrap();
+
+        // Put user (add with roles)
+        let put_event = EventBuilder::group_put_user(
+            group_id.clone(),
+            member_key.public_key(),
+            vec!["member".to_string(), "moderator".to_string()],
+        )
+        .sign_with_keys(&admin_keys)
+        .unwrap();
+
+        assert_eq!(put_event.kind, Kind::GroupPutUser);
+
+        // Check for role tags
+        let role_count = put_event.tags.iter().filter(|t| t.as_slice()[0] == "role").count();
+        assert_eq!(role_count, 2);
+
+        // Remove user
+        let remove_event = EventBuilder::group_remove_user(group_id.clone(), member_key.public_key())
+            .sign_with_keys(&admin_keys)
+            .unwrap();
+
+        assert_eq!(remove_event.kind, Kind::GroupRemoveUser);
+
+        // Check for p tag
+        let has_p_tag = remove_event.tags.iter().any(|t| {
+            t.as_slice()[0] == "p" && t.as_slice()[1] == member_key.public_key().to_hex()
+        });
+        assert!(has_p_tag);
+
+        // Delete group
+        let delete_event = EventBuilder::group_delete(group_id)
+            .sign_with_keys(&admin_keys)
+            .unwrap();
+
+        assert_eq!(delete_event.kind, Kind::GroupDelete);
+    }
+
+    #[test]
+    #[cfg(feature = "std")]
+    fn test_nip29_with_previous_events() {
+        use crate::nips::nip29::GroupId;
+
+        let keys = Keys::generate();
+        let relay_url = Url::parse("wss://relay.example.com").unwrap();
+        let group_id = GroupId::new(relay_url, "test-group".to_string()).unwrap();
+
+        let event1 = EventBuilder::group_message(group_id.clone(), "First message")
+            .sign_with_keys(&keys)
+            .unwrap();
+
+        let event2 = EventBuilder::group_message(group_id, "Second message")
+            .with_previous_events(vec![event1.id])
+            .sign_with_keys(&keys)
+            .unwrap();
+
+        // Check for previous tag
+        let has_previous_tag = event2.tags.iter().any(|t| t.as_slice()[0] == "previous");
+        assert!(has_previous_tag);
+
+        // Verify the reference is first 8 chars
+        let previous_tag = event2.tags.iter().find(|t| t.as_slice()[0] == "previous").unwrap();
+        let reference = &previous_tag.as_slice()[1];
+        assert_eq!(reference.len(), 8);
+        assert!(event1.id.to_hex().starts_with(reference));
+    }
+
+    #[test]
+    #[cfg(feature = "std")]
+    fn test_nip29_metadata_events() {
+        use crate::nips::nip29::{GroupId, GroupMetadata, GroupAdmins, GroupAdmin, GroupMembers, GroupRoles, Role, Privacy, AccessModel};
+
+        let keys = Keys::generate();
+        let relay_url = Url::parse("wss://relay.example.com").unwrap();
+        let group_id = GroupId::new(relay_url, "test-group".to_string()).unwrap();
+
+        // Group metadata (addressable)
+        let metadata = GroupMetadata {
+            name: Some("Test Group".into()),
+            about: Some("A test group".into()),
+            picture: Some(Url::parse("https://example.com/pic.png").unwrap()),
+            privacy: Privacy::Public,
+            closed: AccessModel::Closed,
+        };
+
+        let meta_event = EventBuilder::group_metadata(group_id.clone(), metadata)
+            .sign_with_keys(&keys)
+            .unwrap();
+
+        assert_eq!(meta_event.kind, Kind::GroupMetadata);
+
+        // Check for d tag (addressable)
+        let has_d_tag = meta_event.tags.iter().any(|t| {
+            t.as_slice()[0] == "d" && t.as_slice()[1] == "test-group"
+        });
+        assert!(has_d_tag);
+
+        // Group admins
+        let admins = GroupAdmins::new().add_admin(GroupAdmin::new(
+            keys.public_key(),
+            vec!["admin".to_string()],
+        ));
+
+        let admins_event = EventBuilder::group_admins(group_id.clone(), admins)
+            .sign_with_keys(&keys)
+            .unwrap();
+
+        assert_eq!(admins_event.kind, Kind::GroupAdmins);
+
+        // Group members
+        let members = GroupMembers::new().add_member(keys.public_key());
+        let members_event = EventBuilder::group_members(group_id.clone(), members)
+            .sign_with_keys(&keys)
+            .unwrap();
+
+        assert_eq!(members_event.kind, Kind::GroupMembers);
+
+        // Group roles
+        let roles = GroupRoles::new()
+            .add_role(Role::new("admin"))
+            .add_role(Role::with_description("moderator", "Can moderate"));
+
+        let roles_event = EventBuilder::group_roles(group_id, roles)
+            .sign_with_keys(&keys)
+            .unwrap();
+
+        assert_eq!(roles_event.kind, Kind::GroupRoles);
+    }
 }
 
 #[cfg(bench)]

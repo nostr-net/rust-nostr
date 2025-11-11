@@ -29,7 +29,7 @@ use super::Error;
 /// let group_id = GroupId::new(url, "rust-devs".to_string()).unwrap();
 /// assert_eq!(group_id.to_string(), "wss://relay.example.com'rust-devs");
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct GroupId {
     /// Relay URL where the group exists
     pub relay_url: Url,
@@ -102,7 +102,7 @@ impl FromStr for GroupId {
 }
 
 /// Group privacy setting
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Privacy {
     /// Public - can be read by external users
     #[default]
@@ -143,7 +143,7 @@ impl FromStr for Privacy {
 }
 
 /// Group access model
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum AccessModel {
     /// Open - join requests automatically approved
     #[default]
@@ -184,7 +184,7 @@ impl FromStr for AccessModel {
 }
 
 /// Group metadata
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct GroupMetadata {
     /// Display name
     pub name: Option<String>,
@@ -222,7 +222,7 @@ impl From<GroupMetadata> for Vec<Tag> {
 }
 
 /// Role definition
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Role {
     /// Role name
     pub name: String,
@@ -256,7 +256,7 @@ impl Role {
 }
 
 /// Group roles definition
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct GroupRoles {
     /// List of role definitions
     pub roles: Vec<Role>,
@@ -292,7 +292,7 @@ impl From<GroupRoles> for Vec<Tag> {
 }
 
 /// Group admin with assigned roles
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct GroupAdmin {
     /// Public key of admin
     pub public_key: PublicKey,
@@ -308,7 +308,7 @@ impl GroupAdmin {
 }
 
 /// Group admins list
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct GroupAdmins {
     /// List of admins
     pub admins: Vec<GroupAdmin>,
@@ -346,7 +346,7 @@ impl From<GroupAdmins> for Vec<Tag> {
 }
 
 /// Group members list
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct GroupMembers {
     /// List of member public keys
     pub members: Vec<PublicKey>,
