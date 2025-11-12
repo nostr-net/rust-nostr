@@ -298,6 +298,31 @@ pub enum TagStandard {
     /// List of web URLs
     Web(Vec<Url>),
     Word(String),
+    /// Group identifier (`h` tag)
+    ///
+    /// <https://github.com/nostr-protocol/nips/blob/master/29.md>
+    GroupId(String),
+    /// Timeline reference (`previous` tag)
+    ///
+    /// References to recent events (first 8 chars of event ID)
+    ///
+    /// <https://github.com/nostr-protocol/nips/blob/master/29.md>
+    Previous(Vec<String>),
+    /// Invite code (`code` tag)
+    ///
+    /// Pre-authorized admission code for closed groups
+    ///
+    /// <https://github.com/nostr-protocol/nips/blob/master/29.md>
+    InviteCode(String),
+    /// Group role assignment
+    ///
+    /// <https://github.com/nostr-protocol/nips/blob/master/29.md>
+    Role {
+        /// Role name
+        name: String,
+        /// Optional description
+        description: Option<String>,
+    },
 }
 
 impl TagStandard {
@@ -416,6 +441,11 @@ impl TagStandard {
                 let urls: Vec<Url> = extract_urls(tag)?;
                 return Ok(Self::Web(urls));
             }
+            TagKind::Custom(Cow::Borrowed("previous")) => {
+                // Extract all values after the tag name as previous event references
+                let previous: Vec<String> = tag[1..].iter().map(|s| s.as_ref().to_string()).collect();
+                return Ok(Self::Previous(previous));
+            }
             _ => (), // Covered later
         };
 
@@ -429,6 +459,10 @@ impl TagStandard {
                     character: Alphabet::G,
                     uppercase: false,
                 }) => Ok(Self::Geohash(tag_1.to_string())),
+                TagKind::SingleLetter(SingleLetterTag {
+                    character: Alphabet::H,
+                    uppercase: false,
+                }) => Ok(Self::GroupId(tag_1.to_string())),
                 TagKind::SingleLetter(SingleLetterTag {
                     character: Alphabet::D,
                     uppercase: false,
@@ -507,6 +541,11 @@ impl TagStandard {
                 TagKind::Word => Ok(Self::Word(tag_1.to_string())),
                 TagKind::Alt => Ok(Self::Alt(tag_1.to_string())),
                 TagKind::Dim => Ok(Self::Dim(ImageDimensions::from_str(tag_1)?)),
+                TagKind::Custom(Cow::Borrowed("code")) => Ok(Self::InviteCode(tag_1.to_string())),
+                TagKind::Custom(Cow::Borrowed("role")) => Ok(Self::Role {
+                    name: tag_1.to_string(),
+                    description: None,
+                }),
                 _ => Err(Error::UnknownStandardizedTag),
             };
         }
@@ -551,6 +590,10 @@ impl TagStandard {
                     }),
                     Err(_) => Err(Error::UnknownStandardizedTag),
                 },
+                TagKind::Custom(Cow::Borrowed("role")) => Ok(Self::Role {
+                    name: tag_1.to_string(),
+                    description: Some(tag_2.to_string()),
+                }),
                 _ => Err(Error::UnknownStandardizedTag),
             };
         }
@@ -738,6 +781,13 @@ impl TagStandard {
             Self::Protected => TagKind::Protected,
             Self::Alt(..) => TagKind::Alt,
             Self::Web(..) => TagKind::Web,
+            Self::GroupId(..) => TagKind::SingleLetter(SingleLetterTag {
+                character: Alphabet::H,
+                uppercase: false,
+            }),
+            Self::Previous(..) => TagKind::Custom(Cow::Borrowed("previous")),
+            Self::InviteCode(..) => TagKind::Custom(Cow::Borrowed("code")),
+            Self::Role { .. } => TagKind::Custom(Cow::Borrowed("role")),
         }
     }
 
@@ -1064,6 +1114,21 @@ impl From<TagStandard> for Vec<String> {
                 tag.push(tag_kind);
                 tag.extend(urls.into_iter().map(|url| url.to_string()));
                 tag
+            }
+            TagStandard::GroupId(id) => vec![tag_kind, id],
+            TagStandard::Previous(refs) => {
+                let mut tag: Vec<String> = Vec::with_capacity(1 + refs.len());
+                tag.push(tag_kind);
+                tag.extend(refs);
+                tag
+            }
+            TagStandard::InviteCode(code) => vec![tag_kind, code],
+            TagStandard::Role { name, description } => {
+                if let Some(desc) = description {
+                    vec![tag_kind, name, desc]
+                } else {
+                    vec![tag_kind, name]
+                }
             }
         };
 

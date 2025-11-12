@@ -169,6 +169,20 @@ kind_variants! {
     ChatMessage => 9, "Chat Message", "<https://github.com/nostr-protocol/nips/blob/master/C7.md>",
     Thread => 11, "Thread", "<https://github.com/nostr-protocol/nips/blob/master/7D.md>",
     WebBookmark => 39701, "Web Bookmark", "<https://github.com/nostr-protocol/nips/blob/master/B0.md>",
+    // NIP-29: Relay-based Groups
+    GroupPutUser => 9000, "Group: Add/Update User", "<https://github.com/nostr-protocol/nips/blob/master/29.md>",
+    GroupRemoveUser => 9001, "Group: Remove User", "<https://github.com/nostr-protocol/nips/blob/master/29.md>",
+    GroupEditMetadata => 9002, "Group: Edit Metadata", "<https://github.com/nostr-protocol/nips/blob/master/29.md>",
+    GroupDeleteEvent => 9005, "Group: Delete Event", "<https://github.com/nostr-protocol/nips/blob/master/29.md>",
+    GroupCreate => 9007, "Group: Create Group", "<https://github.com/nostr-protocol/nips/blob/master/29.md>",
+    GroupDelete => 9008, "Group: Delete Group", "<https://github.com/nostr-protocol/nips/blob/master/29.md>",
+    GroupCreateInvite => 9009, "Group: Create Invite", "<https://github.com/nostr-protocol/nips/blob/master/29.md>",
+    GroupJoinRequest => 9021, "Group: Join Request", "<https://github.com/nostr-protocol/nips/blob/master/29.md>",
+    GroupLeaveRequest => 9022, "Group: Leave Request", "<https://github.com/nostr-protocol/nips/blob/master/29.md>",
+    GroupMetadata => 39000, "Group: Metadata", "<https://github.com/nostr-protocol/nips/blob/master/29.md>",
+    GroupAdmins => 39001, "Group: Admins List", "<https://github.com/nostr-protocol/nips/blob/master/29.md>",
+    GroupMembers => 39002, "Group: Members List", "<https://github.com/nostr-protocol/nips/blob/master/29.md>",
+    GroupRoles => 39003, "Group: Roles Definition", "<https://github.com/nostr-protocol/nips/blob/master/29.md>",
 }
 
 impl PartialEq for Kind {
